@@ -1,0 +1,64 @@
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Editor & IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-*
+
+# Logs
+*.log
+logs/
+*.logs
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Test outputs
+test-output/
+test-results/
+
+# Script-generated files (add specific patterns as needed)
+output/
+*.out
+
+# Windows
+$RECYCLE.BIN/
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Linux
+.directory
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
