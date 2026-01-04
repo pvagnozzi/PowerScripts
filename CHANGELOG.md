@@ -24,6 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic PowerShell profile setup
   - Optional Docker installation integration
   - VS Code extensions: Dev Containers, Docker, PowerShell, GitLens
+- Setup-TypeScript-Dev / setup-typescript-dev scripts for all platforms (Windows, Linux, macOS)
+  - Complete TypeScript/JavaScript development environment
+  - NVM (Node Version Manager) for Node.js version management
+  - Node.js LTS installation
+  - TypeScript, ts-node, Yarn, PNPM package managers
+  - React development tools (Create React App, Vite)
+  - Optional Angular CLI and Vue CLI
+  - ESLint and Prettier for code quality
+  - VS Code with comprehensive TypeScript/React/Angular/Vue extensions
+  - GitHub Copilot CLI integration
+  - Optional WebStorm IDE installation
 
 ### Changed
 - Windows-Check-Health: Added parameters to enable/disable individual operations

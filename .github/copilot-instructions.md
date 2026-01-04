@@ -6,7 +6,7 @@ PowerScripts is a cross-platform collection of utility scripts for Windows (Powe
 ## Core Principles
 
 ### 1. Cross-Platform Synchronization
-- Scripts MUST have the same name across platforms (e.g., `backup.ps1`, `backup.sh`, `backup.zsh`)
+- Scripts MUST have the same base name across platforms (respecting platform-specific naming conventions)
 - Scripts MUST provide identical functionality across all platforms
 - When modifying a script, update ALL platform versions simultaneously
 - Document platform-specific differences when unavoidable
@@ -23,6 +23,12 @@ PowerScripts is a cross-platform collection of utility scripts for Windows (Powe
 - **Feedback**: Provide clear, colored output for success ✅, warnings ⚠️, errors ❌, info ℹ️
 - **Help**: Include `-h` or `--help` flag with comprehensive usage information
 - **Verbosity**: Support `-v` or `--verbose` flag when applicable
+
+### 4. Naming Conventions
+- **Directory Names**: Always lowercase (`scripts/windows/`, `scripts/linux/`, `scripts/macos/`)
+- **Windows Scripts**: PascalCase with hyphens - capitalize first letter and after each hyphen (e.g., `Backup-Files.ps1`, `Create-User.ps1`)
+- **Linux/macOS Scripts**: lowercase with hyphens (e.g., `backup-files.sh`, `create-user.zsh`)
+- **Consistency**: Respect platform-specific naming conventions while maintaining functional parity across all platforms
 
 ## Platform-Specific Guidelines
 
@@ -74,9 +80,21 @@ Each script should follow this structure:
 
 ## File Naming Conventions
 
-- Use lowercase with hyphens: `backup-files.ps1`, `backup-files.sh`
+### Script Files
+- **Windows (PowerShell)**: PascalCase with hyphens - capitalize first letter and after each hyphen
+  - Examples: `Backup-Files.ps1`, `Create-User.ps1`, `Get-SystemInfo.ps1`
+- **Linux (Bash)**: lowercase with hyphens
+  - Examples: `backup-files.sh`, `create-user.sh`, `get-system-info.sh`
+- **macOS (Zsh)**: lowercase with hyphens
+  - Examples: `backup-files.zsh`, `create-user.zsh`, `get-system-info.zsh`
 - Use descriptive, action-oriented names
 - Keep names concise but clear
+
+### Directory Structure
+- All directory names MUST use lowercase
+- Use platform names as-is: `windows`, `linux`, `macos`
+- Follow the established structure: `scripts/{platform}/`
+- Do NOT use camelCase, PascalCase, or UPPERCASE for directories
 
 ## Testing & Validation
 
