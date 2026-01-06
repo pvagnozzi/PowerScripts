@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
 
 #
-# Setup ESP32 development environment on Linux
+# Setup C++ development environment on Linux
 #
-# Configures the system for ESP32 development by installing and configuring:
+# Configures the system for C++ development by installing:
 # - Git version control
-# - Visual Studio Code with ESP32/PlatformIO/C++ extensions
-# - ESP-IDF (ESP32 SDK)
-# - PlatformIO
-# - C/C++ build tools
-# - Python (required for ESP-IDF)
-# - Oh My Posh with automatic initialization and user theme
+# - CMake build system
+# - Ninja build system
+# - vcpkg package manager
+# - GCC compiler
+# - Clang/LLVM compiler
+# - Build essentials and development tools
+# - Visual Studio Code with C++ extensions
+# - Oh My Posh with user theme
 # 
-# All tools are configured with proper PATH settings and integrations.
+# All tools are configured with proper PATH settings.
 #
 # Usage:
-#   sudo ./setup-esp32-dev.sh
-#   sudo ./setup-esp32-dev.sh --skip-updates
+#   sudo ./setup-cpp-dev.sh
+#   sudo ./setup-cpp-dev.sh --skip-updates
+#   sudo ./setup-cpp-dev.sh -v
 #
 # Options:
 #   --skip-updates     Skip updating existing tools
@@ -144,7 +147,7 @@ add_to_path() {
     fi
 }
 
-action "🎯 Starting ESP32 Development Environment Setup"
+action "🎯 Starting C++ Development Environment Setup"
 info "Platform: Linux"
 
 # Check for root privileges
@@ -162,28 +165,21 @@ action "Installing system dependencies..."
 case $PM in
     apt)
         apt-get update -qq
-        apt-get install -y git wget curl python3 python3-pip python3-venv \
-            gcc g++ make cmake ninja-build \
-            libusb-1.0-0 libusb-1.0-0-dev \
-            flex bison gperf ccache libffi-dev libssl-dev dfu-util
+        apt-get install -y build-essential curl wget git software-properties-common \
+            pkg-config autoconf automake libtool m4 unzip tar zip
         ;;
     dnf|yum)
-        $PM install -y git wget curl python3 python3-pip \
-            gcc gcc-c++ make cmake ninja-build \
-            libusbx-devel \
-            flex bison gperf ccache libffi-devel openssl-devel dfu-util
+        $PM group install -y "Development Tools"
+        $PM install -y curl wget git gcc gcc-c++ make autoconf automake libtool \
+            pkg-config unzip tar zip
         ;;
     pacman)
-        pacman -S --noconfirm git wget curl python python-pip \
-            gcc make cmake ninja \
-            libusb \
-            flex bison gperf ccache dfu-util
+        pacman -S --noconfirm base-devel curl wget git
         ;;
     zypper)
-        zypper install -y git wget curl python3 python3-pip \
-            gcc gcc-c++ make cmake ninja \
-            libusb-1_0-devel \
-            flex bison gperf ccache libffi-devel libopenssl-devel dfu-util
+        zypper install -t pattern -y devel_basis
+        zypper install -y curl wget git gcc gcc-c++ make autoconf automake libtool \
+            pkg-config unzip tar zip
         ;;
 esac
 success "System dependencies installed"
@@ -196,6 +192,155 @@ if ! command_exists git; then
     success "Git installed"
 else
     success "Git already installed"
+fi
+
+# Install GCC
+action "Checking GCC..."
+if ! command_exists g++; then
+    info "Installing GCC..."
+    case $PM in
+        apt)
+            install_package g++
+            ;;
+        dnf|yum)
+            install_package gcc-c++
+            ;;
+        pacman)
+            install_package gcc
+            ;;
+        zypper)
+            install_package gcc-c++
+            ;;
+    esac
+    success "GCC installed"
+else
+    success "GCC already installed"
+fi
+
+# Install Clang/LLVM
+action "Installing/Updating Clang/LLVM..."
+if ! command_exists clang; then
+    info "Installing Clang..."
+    case $PM in
+        apt)
+            apt-get install -y clang lldb lld
+            ;;
+        dnf|yum)
+            $PM install -y clang llvm lld lldb
+            ;;
+        pacman)
+            pacman -S --noconfirm clang llvm lld lldb
+            ;;
+        zypper)
+            zypper install -y clang llvm lld lldb
+            ;;
+    esac
+    success "Clang/LLVM installed"
+else
+    success "Clang/LLVM already installed"
+fi
+
+# Install CMake
+action "Installing/Updating CMake..."
+if ! command_exists cmake; then
+    info "Installing CMake..."
+    case $PM in
+        apt)
+            # Install latest CMake via Kitware APT repository
+            wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+            apt-add-repository -y "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main"
+            apt-get update -qq
+            apt-get install -y cmake
+            ;;
+        dnf|yum)
+            $PM install -y cmake
+            ;;
+        pacman)
+            pacman -S --noconfirm cmake
+            ;;
+        zypper)
+            zypper install -y cmake
+            ;;
+    esac
+    success "CMake installed"
+else
+    success "CMake already installed"
+    if [[ "$SKIP_UPDATES" != true ]]; then
+        case $PM in
+            apt)
+                apt-get install -y --only-upgrade cmake
+                ;;
+            dnf|yum)
+                $PM update -y cmake
+                ;;
+            pacman)
+                pacman -S --noconfirm cmake
+                ;;
+            zypper)
+                zypper update -y cmake
+                ;;
+        esac
+    fi
+fi
+
+# Install Ninja
+action "Installing/Updating Ninja..."
+if ! command_exists ninja; then
+    info "Installing Ninja..."
+    case $PM in
+        apt)
+            apt-get install -y ninja-build
+            ;;
+        dnf|yum)
+            $PM install -y ninja-build
+            ;;
+        pacman)
+            pacman -S --noconfirm ninja
+            ;;
+        zypper)
+            zypper install -y ninja
+            ;;
+    esac
+    success "Ninja installed"
+else
+    success "Ninja already installed"
+fi
+
+# Install vcpkg
+action "Installing/Updating vcpkg..."
+VCPKG_ROOT="$USER_HOME/vcpkg"
+if [[ ! -f "$VCPKG_ROOT/vcpkg" ]]; then
+    info "Cloning vcpkg repository..."
+    sudo -u $SUDO_USER git clone https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+    
+    info "Bootstrapping vcpkg..."
+    sudo -u $SUDO_USER "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+    
+    add_to_path "$VCPKG_ROOT"
+    
+    # Set environment variable
+    SHELL_RC="$USER_HOME/.bashrc"
+    if [[ "$SHELL" == *"zsh"* ]]; then
+        SHELL_RC="$USER_HOME/.zshrc"
+    fi
+    
+    if ! grep -q "VCPKG_ROOT" "$SHELL_RC" 2>/dev/null; then
+        echo "export VCPKG_ROOT=\"$VCPKG_ROOT\"" >> "$SHELL_RC"
+        success "VCPKG_ROOT environment variable set"
+    fi
+    
+    success "vcpkg installed"
+else
+    success "vcpkg already installed"
+    add_to_path "$VCPKG_ROOT"
+    
+    if [[ "$SKIP_UPDATES" != true ]]; then
+        info "Updating vcpkg..."
+        cd "$VCPKG_ROOT"
+        sudo -u $SUDO_USER git pull
+        sudo -u $SUDO_USER ./bootstrap-vcpkg.sh -disableMetrics
+        success "vcpkg updated"
+    fi
 fi
 
 # Install VS Code
@@ -216,6 +361,9 @@ if ! command_exists code; then
             $PM check-update
             $PM install -y code
             ;;
+        pacman)
+            pacman -S --noconfirm code
+            ;;
         *)
             warning "Please install VS Code manually from https://code.visualstudio.com/"
             ;;
@@ -233,91 +381,20 @@ if command_exists code; then
         "ms-vscode.cpptools-extension-pack"
         "ms-vscode.cmake-tools"
         "twxs.cmake"
-        "platformio.platformio-ide"
-        "espressif.esp-idf-extension"
-        "ms-python.python"
-        "ms-python.vscode-pylance"
+        "llvm-vs-code-extensions.vscode-clangd"
+        "vadimcn.vscode-lldb"
+        "usernamehw.errorlens"
         "eamodio.gitlens"
         "GitHub.copilot"
         "GitHub.copilot-chat"
-        "usernamehw.errorlens"
-        "jeff-hykin.better-cpp-syntax"
+        "ms-vscode-remote.remote-containers"
+        "ms-azuretools.vscode-docker"
     )
     for ext in "${extensions[@]}"; do
         info "Installing extension: $ext"
         sudo -u $SUDO_USER code --install-extension "$ext" --force 2>/dev/null || true
     done
     success "VS Code extensions installed"
-fi
-
-# Install ESP-IDF
-action "Installing ESP-IDF (ESP32 SDK)..."
-ESP_IDF_PATH="$USER_HOME/esp/esp-idf"
-
-if [[ ! -d "$ESP_IDF_PATH" ]]; then
-    info "Cloning ESP-IDF repository..."
-    sudo -u $SUDO_USER mkdir -p "$USER_HOME/esp"
-    sudo -u $SUDO_USER git clone --recursive https://github.com/espressif/esp-idf.git "$ESP_IDF_PATH"
-    
-    info "Installing ESP-IDF tools..."
-    cd "$ESP_IDF_PATH"
-    sudo -u $SUDO_USER ./install.sh all
-    
-    success "ESP-IDF installed"
-    
-    # Add ESP-IDF environment to shell config
-    SHELL_CONFIGS=("$USER_HOME/.bashrc" "$USER_HOME/.zshrc")
-    for SHELL_RC in "${SHELL_CONFIGS[@]}"; do
-        if [[ -f "$SHELL_RC" ]]; then
-            if ! grep -q "IDF_PATH" "$SHELL_RC" 2>/dev/null; then
-                {
-                    echo ""
-                    echo "# ESP-IDF"
-                    echo "export IDF_PATH=\"$ESP_IDF_PATH\""
-                } >> "$SHELL_RC"
-            fi
-        fi
-    done
-    
-    info "ESP-IDF location: $ESP_IDF_PATH"
-else
-    success "ESP-IDF already installed"
-    if [[ "$SKIP_UPDATES" != true ]]; then
-        info "Updating ESP-IDF..."
-        cd "$ESP_IDF_PATH"
-        sudo -u $SUDO_USER git pull
-        sudo -u $SUDO_USER ./install.sh all
-    fi
-fi
-
-# Install PlatformIO
-action "Installing/Updating PlatformIO Core..."
-if ! command_exists pio; then
-    info "Installing PlatformIO..."
-    python3 -m pip install --upgrade pip
-    pip3 install --upgrade platformio
-    success "PlatformIO installed"
-else
-    success "PlatformIO already installed"
-    if [[ "$SKIP_UPDATES" != true ]]; then
-        pip3 install --upgrade platformio
-    fi
-fi
-
-# Configure USB permissions for ESP32
-action "Configuring USB permissions..."
-UDEV_RULE="/etc/udev/rules.d/99-platformio-udev.rules"
-if [[ ! -f "$UDEV_RULE" ]]; then
-    info "Creating udev rules for ESP32..."
-    curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core/master/scripts/99-platformio-udev.rules -o "$UDEV_RULE"
-    udevadm control --reload-rules
-    udevadm trigger
-    usermod -aG dialout $SUDO_USER 2>/dev/null || true
-    usermod -aG plugdev $SUDO_USER 2>/dev/null || true
-    success "USB permissions configured"
-    note "Log out and log back in for USB permissions to take effect"
-else
-    success "USB permissions already configured"
 fi
 
 # Install Oh My Posh
@@ -350,7 +427,6 @@ for SHELL_RC in "${SHELL_CONFIGS[@]}"; do
         SHELL_NAME="bash"
     fi
     
-    # Create file if it doesn't exist
     sudo -u $SUDO_USER touch "$SHELL_RC" 2>/dev/null
     
     if ! grep -q "oh-my-posh init" "$SHELL_RC" 2>/dev/null; then
@@ -365,17 +441,39 @@ for SHELL_RC in "${SHELL_CONFIGS[@]}"; do
     fi
 done
 
+# Install additional development libraries
+action "Installing common C++ development libraries..."
+case $PM in
+    apt)
+        apt-get install -y libssl-dev libcurl4-openssl-dev zlib1g-dev \
+            libboost-all-dev libjsoncpp-dev
+        ;;
+    dnf|yum)
+        $PM install -y openssl-devel libcurl-devel zlib-devel \
+            boost-devel jsoncpp-devel
+        ;;
+    pacman)
+        pacman -S --noconfirm openssl curl zlib boost jsoncpp
+        ;;
+    zypper)
+        zypper install -y libopenssl-devel libcurl-devel zlib-devel \
+            boost-devel libjsoncpp-devel
+        ;;
+esac
+success "Development libraries installed"
+
 # Final summary
 action ""
 action "📊 Installation Summary"
 info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 command_exists git && success "Git is ready" || warning "Git needs attention"
-command_exists code && success "VS Code is ready" || warning "VS Code needs attention"
+command_exists g++ && success "GCC is ready" || warning "GCC needs attention"
+command_exists clang && success "Clang is ready" || warning "Clang needs attention"
 command_exists cmake && success "CMake is ready" || warning "CMake needs attention"
 command_exists ninja && success "Ninja is ready" || warning "Ninja needs attention"
-[[ -d "$ESP_IDF_PATH" ]] && success "ESP-IDF is ready" || warning "ESP-IDF needs attention"
-command_exists pio && success "PlatformIO is ready" || warning "PlatformIO needs attention"
+[[ -f "$VCPKG_ROOT/vcpkg" ]] && success "vcpkg is ready" || warning "vcpkg needs attention"
+command_exists code && success "VS Code is ready" || warning "VS Code needs attention"
 command_exists oh-my-posh && success "Oh My Posh is ready" || warning "Oh My Posh needs attention"
 
 # Display versions
@@ -387,32 +485,36 @@ if command_exists git; then
     info "Git: $(git --version)"
 fi
 
-if command_exists python3; then
-    info "Python: $(python3 --version)"
+if command_exists g++; then
+    info "GCC: $(g++ --version | head -n1)"
 fi
 
-if command_exists code; then
-    info "VS Code: $(code --version | head -n1)"
+if command_exists clang; then
+    info "Clang: $(clang --version | head -n1)"
 fi
 
 if command_exists cmake; then
     info "CMake: $(cmake --version | head -n1)"
 fi
 
-if command_exists pio; then
-    info "PlatformIO: $(pio --version)"
+if command_exists ninja; then
+    info "Ninja: $(ninja --version)"
+fi
+
+if command_exists code; then
+    info "VS Code: $(code --version | head -n1)"
 fi
 
 action ""
 action "✨ Setup Complete!"
 note "Next steps:"
 info "1. Restart your terminal to apply PATH changes"
-info "2. Log out and log back in for USB permissions (dialout group)"
-info "3. VS Code: Open and let PlatformIO extension complete installation"
-info "4. Test ESP-IDF: source $ESP_IDF_PATH/export.sh"
-info "5. Create ESP32 project: pio project init --board esp32dev"
-info "6. Configure Oh My Posh theme as desired"
+info "2. Test CMake: cmake --version"
+info "3. Test GCC: g++ --version"
+info "4. Test Clang: clang --version"
+info "5. Install packages with vcpkg: vcpkg install <package-name>"
+info "6. Create a CMake project and configure with: cmake -B build -G Ninja"
 info "7. VS Code: Sign in with GitHub for Copilot activation"
-info "8. Connect your ESP32 board and check: ls /dev/ttyUSB* or ls /dev/ttyACM*"
+note "Sample vcpkg packages: fmt, nlohmann-json, boost, catch2, spdlog"
 success ""
-success "Happy ESP32 coding! 🚀"
+success "Happy coding! 🚀"

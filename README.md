@@ -787,6 +787,145 @@ chmod +x scripts/macos/setup-typescript-dev.zsh
 
 ---
 
+### `Setup-Cpp-Dev` / `setup-cpp-dev`
+Complete C++ development environment setup with CMake, vcpkg, GCC, Clang, and all necessary build tools.
+
+**Features:**
+- 🔧 Git version control
+- 🏗️ CMake build system (latest version)
+- ⚡ Ninja build system for fast builds
+- 📦 vcpkg package manager (Microsoft)
+- 🔨 GCC compiler (MinGW-w64 on Windows, native on Linux/macOS)
+- 🦙 Clang/LLVM compiler toolchain
+- 🏢 MSVC Build Tools (Windows only, optional)
+- 📝 VS Code with comprehensive C++ extensions
+- ⚡ PowerShell 7 (Windows only)
+- 🎨 Oh My Posh with automatic initialization and user theme
+- 📚 Common development libraries (OpenSSL, Curl, Boost, etc.)
+- ⚙️ Automatic PATH and environment configuration
+
+**Platforms:**
+- **Windows**: `scripts/windows/Setup-Cpp-Dev.ps1`
+- **Linux**: `scripts/linux/setup-cpp-dev.sh`
+- **macOS**: `scripts/macos/setup-cpp-dev.zsh`
+
+**Quick Start:**
+
+**Windows:**
+```powershell
+# Full installation (includes MSVC Build Tools)
+.\scripts\windows\Setup-Cpp-Dev.ps1
+
+# Skip Visual Studio Build Tools
+.\scripts\windows\Setup-Cpp-Dev.ps1 -SkipVisualStudio
+
+# Skip updates
+.\scripts\windows\Setup-Cpp-Dev.ps1 -SkipUpdates
+
+# Verbose output
+.\scripts\windows\Setup-Cpp-Dev.ps1 -Verbose
+```
+
+**Linux:**
+```bash
+# Make executable (first time)
+chmod +x scripts/linux/setup-cpp-dev.sh
+
+# Full installation
+sudo ./scripts/linux/setup-cpp-dev.sh
+
+# Skip updates
+sudo ./scripts/linux/setup-cpp-dev.sh --skip-updates
+
+# Show help
+./scripts/linux/setup-cpp-dev.sh --help
+```
+
+**macOS:**
+```zsh
+# Make executable (first time)
+chmod +x scripts/macos/setup-cpp-dev.zsh
+
+# Full installation
+./scripts/macos/setup-cpp-dev.zsh
+
+# Skip updates
+./scripts/macos/setup-cpp-dev.zsh --skip-updates
+
+# Show help
+./scripts/macos/setup-cpp-dev.zsh --help
+```
+
+**Parameters/Options:**
+- `--skip-updates` / `-SkipUpdates` - Skip updating existing tools
+- `-SkipVisualStudio` - Skip MSVC Build Tools installation (Windows only)
+- `-v, --verbose` / `-Verbose` - Show detailed output
+
+**What Gets Installed:**
+1. **Package Manager** - Chocolatey (Windows) / Homebrew (macOS) / system package manager (Linux)
+2. **Git** - Version control
+3. **PowerShell 7** - Latest shell (Windows only)
+4. **Oh My Posh** - Beautiful terminal prompts (auto-configured)
+5. **CMake** - Cross-platform build system generator
+6. **Ninja** - Small build system with focus on speed
+7. **GCC/G++** - GNU Compiler Collection (MinGW-w64 on Windows)
+8. **Clang/LLVM** - Modern C/C++ compiler with excellent diagnostics
+9. **MSVC Build Tools** - Microsoft C++ compiler (Windows only, optional)
+10. **vcpkg** - C++ library manager (~/.vcpkg or ~/vcpkg)
+11. **VS Code** - With comprehensive C++ extensions
+12. **Development Libraries** - OpenSSL, libcurl, zlib, Boost, jsoncpp
+
+**VS Code Extensions:**
+- C/C++ IntelliSense and debugging (Microsoft)
+- C/C++ Extension Pack
+- CMake Tools
+- CMake language support
+- clangd (LLVM language server)
+- LLDB Debugger
+- Error Lens
+- GitLens
+- GitHub Copilot + Chat
+- Dev Containers
+- Docker support
+
+**Post-Installation:**
+- Restart terminal for PATH changes
+- Test CMake: `cmake --version`
+- Test GCC: `g++ --version`
+- Test Clang: `clang --version`
+- Test vcpkg: `vcpkg search <package-name>`
+- Install libraries: `vcpkg install fmt nlohmann-json boost catch2 spdlog`
+- Create CMake project: `cmake -B build -G Ninja`
+- Build project: `cmake --build build`
+- VS Code: Sign in with GitHub for Copilot activation
+
+**Sample vcpkg Packages:**
+- `fmt` - Modern formatting library
+- `nlohmann-json` - JSON for Modern C++
+- `boost` - Comprehensive C++ libraries
+- `catch2` - Modern testing framework
+- `spdlog` - Fast logging library
+- `range-v3` - Range library
+- `abseil` - Google's C++ library collection
+
+**Environment Variables Set:**
+- `VCPKG_ROOT` - Path to vcpkg installation
+- `PATH` - Updated with all tool paths
+
+**Requirements:**
+- **Windows**: Administrator privileges recommended, PowerShell 5.1+
+- **Linux**: sudo privileges, supported package manager
+- **macOS**: Administrator privileges, macOS 11.0+, Xcode Command Line Tools
+
+**Notes:**
+- Scripts are idempotent - safe to run multiple times
+- vcpkg integrates with CMake automatically
+- MSVC Build Tools required for some vcpkg packages on Windows
+- macOS: Apple Clang is default, LLVM Clang available via Homebrew
+- Linux: GCC is default system compiler
+
+---
+
 ## 🎨 Output Style
 
 All scripts follow a consistent visual language:

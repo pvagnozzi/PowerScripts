@@ -26,9 +26,7 @@ README text eol=lf
 *.json text eol=lf
 *.toml text eol=lf
 
-# Make scripts executable on Unix systems
-*.sh filter=lfs diff=lfs merge=lfs -text
-*.zsh filter=lfs diff=lfs merge=lfs -text
+
 
 # Binary files
 *.exe binary
