@@ -7,6 +7,7 @@
 # - Git version control
 # - Visual Studio Code with ESP32/PlatformIO/C++ extensions
 # - ESP-IDF (ESP32 SDK)
+# - CMake, GCC, Clang
 # - PlatformIO
 # - C/C++ build tools
 # - Python (required for ESP-IDF)
@@ -163,25 +164,25 @@ case $PM in
     apt)
         apt-get update -qq
         apt-get install -y git wget curl python3 python3-pip python3-venv \
-            gcc g++ make cmake ninja-build \
+            gcc g++ clang make cmake ninja-build \
             libusb-1.0-0 libusb-1.0-0-dev \
             flex bison gperf ccache libffi-dev libssl-dev dfu-util
         ;;
     dnf|yum)
         $PM install -y git wget curl python3 python3-pip \
-            gcc gcc-c++ make cmake ninja-build \
+            gcc gcc-c++ clang make cmake ninja-build \
             libusbx-devel \
             flex bison gperf ccache libffi-devel openssl-devel dfu-util
         ;;
     pacman)
         pacman -S --noconfirm git wget curl python python-pip \
-            gcc make cmake ninja \
+            gcc clang make cmake ninja \
             libusb \
             flex bison gperf ccache dfu-util
         ;;
     zypper)
         zypper install -y git wget curl python3 python3-pip \
-            gcc gcc-c++ make cmake ninja \
+            gcc gcc-c++ clang make cmake ninja \
             libusb-1_0-devel \
             flex bison gperf ccache libffi-devel libopenssl-devel dfu-util
         ;;
@@ -242,6 +243,7 @@ if command_exists code; then
         "GitHub.copilot-chat"
         "usernamehw.errorlens"
         "jeff-hykin.better-cpp-syntax"
+        "llvm-vs-code-extensions.vscode-clangd"
     )
     for ext in "${extensions[@]}"; do
         info "Installing extension: $ext"
@@ -303,6 +305,48 @@ else
         pip3 install --upgrade platformio
     fi
 fi
+
+# Configure ESP-IDF extension in VS Code
+action "Configuring ESP-IDF extension..."
+VSCODE_SETTINGS_DIR="$USER_HOME/.config/Code/User"
+VSCODE_SETTINGS_FILE="$VSCODE_SETTINGS_DIR/settings.json"
+
+sudo -u $SUDO_USER mkdir -p "$VSCODE_SETTINGS_DIR"
+
+if [[ -f "$VSCODE_SETTINGS_FILE" ]]; then
+    # Update existing settings
+    TEMP_FILE=$(mktemp)
+    python3 -c "
+import json
+import sys
+try:
+    with open('$VSCODE_SETTINGS_FILE', 'r') as f:
+        settings = json.load(f)
+except:
+    settings = {}
+
+settings['idf.espIdfPath'] = '$ESP_IDF_PATH'
+settings['idf.toolsPath'] = '$USER_HOME/.espressif'
+settings['idf.pythonBinPath'] = '$(which python3)'
+
+with open('$TEMP_FILE', 'w') as f:
+    json.dump(settings, f, indent=4)
+" 2>/dev/null || echo '{}' > "$TEMP_FILE"
+    
+    sudo -u $SUDO_USER cp "$TEMP_FILE" "$VSCODE_SETTINGS_FILE"
+    rm -f "$TEMP_FILE"
+else
+    # Create new settings
+    sudo -u $SUDO_USER cat > "$VSCODE_SETTINGS_FILE" <<EOF
+{
+    "idf.espIdfPath": "$ESP_IDF_PATH",
+    "idf.toolsPath": "$USER_HOME/.espressif",
+    "idf.pythonBinPath": "$(which python3)"
+}
+EOF
+fi
+
+success "ESP-IDF extension configured with path: $ESP_IDF_PATH"
 
 # Configure USB permissions for ESP32
 action "Configuring USB permissions..."
@@ -374,6 +418,8 @@ command_exists git && success "Git is ready" || warning "Git needs attention"
 command_exists code && success "VS Code is ready" || warning "VS Code needs attention"
 command_exists cmake && success "CMake is ready" || warning "CMake needs attention"
 command_exists ninja && success "Ninja is ready" || warning "Ninja needs attention"
+command_exists gcc && success "GCC is ready" || warning "GCC needs attention"
+command_exists clang && success "Clang is ready" || warning "Clang needs attention"
 [[ -d "$ESP_IDF_PATH" ]] && success "ESP-IDF is ready" || warning "ESP-IDF needs attention"
 command_exists pio && success "PlatformIO is ready" || warning "PlatformIO needs attention"
 command_exists oh-my-posh && success "Oh My Posh is ready" || warning "Oh My Posh needs attention"
@@ -397,6 +443,14 @@ fi
 
 if command_exists cmake; then
     info "CMake: $(cmake --version | head -n1)"
+fi
+
+if command_exists gcc; then
+    info "GCC: $(gcc --version | head -n1)"
+fi
+
+if command_exists clang; then
+    info "Clang: $(clang --version | head -n1)"
 fi
 
 if command_exists pio; then

@@ -8,6 +8,7 @@
     - PowerShell 7 (latest version)
     - Visual Studio Code with ESP32/PlatformIO/C++ extensions
     - ESP-IDF (ESP32 SDK)
+    - CMake, GCC, Clang
     - PlatformIO
     - C/C++ build tools
     - Python (required for ESP-IDF)
@@ -175,7 +176,8 @@ if (Test-Command "code") {
         "GitHub.copilot",
         "GitHub.copilot-chat",
         "usernamehw.errorlens",
-        "jeff-hykin.better-cpp-syntax"
+        "jeff-hykin.better-cpp-syntax",
+        "llvm-vs-code-extensions.vscode-clangd"
     )
     foreach ($ext in $extensions) {
         Write-Info "Installing extension: $ext"
@@ -207,30 +209,69 @@ if (-not (Test-Command "ninja")) {
     Write-Success "Ninja already installed"
 }
 
+# Install GCC
+Write-Action "Installing/Updating GCC (MinGW)..."
+if (-not (Test-Command "gcc")) {
+    choco install mingw -y
+    Write-Success "GCC (MinGW) installed"
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+} else {
+    Write-Success "GCC already installed"
+    if (-not $SkipUpdates) {
+        choco upgrade mingw -y
+    }
+}
+
+# Install Clang
+Write-Action "Installing/Updating Clang (LLVM)..."
+if (-not (Test-Command "clang")) {
+    choco install llvm -y
+    Write-Success "Clang (LLVM) installed"
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+} else {
+    Write-Success "Clang already installed"
+    if (-not $SkipUpdates) {
+        choco upgrade llvm -y
+    }
+}
+
 # Install ESP-IDF
 Write-Action "Installing ESP-IDF (ESP32 SDK)..."
-$espIdfPath = "$env:USERPROFILE\esp\esp-idf"
+$espIdfPath = "C:\tools\esp-idf"
+$espToolsPath = "C:\tools\.espressif"
+
 if (-not (Test-Path $espIdfPath)) {
-    Write-Info "Cloning ESP-IDF repository..."
-    New-Item -ItemType Directory -Path "$env:USERPROFILE\esp" -Force | Out-Null
+    Write-Info "Cloning ESP-IDF repository to C:\tools..."
+    New-Item -ItemType Directory -Path "C:\tools" -Force | Out-Null
     git clone --recursive https://github.com/espressif/esp-idf.git $espIdfPath
     
-    Write-Info "Installing ESP-IDF tools..."
+    Write-Info "Installing ESP-IDF tools to C:\tools\.espressif..."
     Set-Location $espIdfPath
+    
+    # Set tools path before running install
+    $env:IDF_TOOLS_PATH = $espToolsPath
+    [Environment]::SetEnvironmentVariable("IDF_TOOLS_PATH", $espToolsPath, "User")
+    
     & .\install.bat all
     
-    Write-Success "ESP-IDF installed"
+    Write-Success "ESP-IDF installed to C:\tools"
     
     # Set environment variables
     [Environment]::SetEnvironmentVariable("IDF_PATH", $espIdfPath, "User")
     $env:IDF_PATH = $espIdfPath
     
     Write-Info "ESP-IDF location: $espIdfPath"
+    Write-Info "ESP-IDF tools location: $espToolsPath"
 } else {
-    Write-Success "ESP-IDF already installed"
+    Write-Success "ESP-IDF already installed at C:\tools"
     if (-not $SkipUpdates) {
         Write-Info "Updating ESP-IDF..."
         Set-Location $espIdfPath
+        
+        # Ensure tools path is set
+        $env:IDF_TOOLS_PATH = $espToolsPath
+        [Environment]::SetEnvironmentVariable("IDF_TOOLS_PATH", $espToolsPath, "User")
+        
         git pull
         & .\install.bat all
     }
@@ -249,6 +290,30 @@ if (-not (Test-Command "pio")) {
         pip install --upgrade platformio
     }
 }
+
+# Configure ESP-IDF extension in VS Code
+Write-Action "Configuring ESP-IDF extension..."
+$vscodeSettingsDir = "$env:APPDATA\Code\User"
+$vscodeSettingsFile = "$vscodeSettingsDir\settings.json"
+
+if (-not (Test-Path $vscodeSettingsDir)) {
+    New-Item -ItemType Directory -Path $vscodeSettingsDir -Force | Out-Null
+}
+
+if (Test-Path $vscodeSettingsFile) {
+    $settings = Get-Content $vscodeSettingsFile -Raw | ConvertFrom-Json
+} else {
+    $settings = @{}
+}
+
+$settings | Add-Member -NotePropertyName "idf.espIdfPath" -NotePropertyValue $espIdfPath -Force
+$settings | Add-Member -NotePropertyName "idf.toolsPath" -NotePropertyValue $espToolsPath -Force
+$settings | Add-Member -NotePropertyName "idf.pythonBinPath" -NotePropertyValue (Get-Command python -ErrorAction SilentlyContinue).Source -Force
+
+$settings | ConvertTo-Json -Depth 10 | Set-Content $vscodeSettingsFile -Force
+Write-Success "ESP-IDF extension configured"
+Write-Info "IDF Path: $espIdfPath"
+Write-Info "Tools Path: $espToolsPath"
 
 # Install Oh My Posh
 Write-Action "Installing/Updating Oh My Posh..."
@@ -303,6 +368,8 @@ $tools = @{
     "VS Code" = (Test-Command "code")
     "CMake" = (Test-Command "cmake")
     "Ninja" = (Test-Command "ninja")
+    "GCC" = (Test-Command "gcc")
+    "Clang" = (Test-Command "clang")
     "ESP-IDF" = (Test-Path $espIdfPath)
     "PlatformIO" = (Test-Command "pio")
     "Oh My Posh" = (Test-Command "oh-my-posh")
@@ -340,6 +407,16 @@ if (Test-Command "cmake") {
     Write-Info "CMake: $cmakeVersion"
 }
 
+if (Test-Command "gcc") {
+    $gccVersion = gcc --version | Select-Object -First 1
+    Write-Info "GCC: $gccVersion"
+}
+
+if (Test-Command "clang") {
+    $clangVersion = clang --version | Select-Object -First 1
+    Write-Info "Clang: $clangVersion"
+}
+
 if (Test-Command "pio") {
     $pioVersion = pio --version
     Write-Info "PlatformIO: $pioVersion"
@@ -349,9 +426,12 @@ Write-Action "`n✨ Setup Complete!"
 Write-Note "Next steps:"
 Write-Info "1. Restart your terminal to apply PATH changes"
 Write-Info "2. VS Code: Open and let PlatformIO extension complete installation"
-Write-Info "3. Test ESP-IDF: Run 'export.ps1' from $espIdfPath"
+Write-Info "3. Test ESP-IDF: Run 'C:\tools\esp-idf\export.ps1'"
 Write-Info "4. Create ESP32 project: pio project init --board esp32dev"
 Write-Info "5. Configure Oh My Posh theme as desired"
 Write-Info "6. VS Code: Sign in with GitHub for Copilot activation"
 Write-Info "7. Connect your ESP32 board and check device in Device Manager"
+Write-Note "`nInstallation Paths:"
+Write-Info "ESP-IDF: C:\tools\esp-idf"
+Write-Info "ESP Tools: C:\tools\.espressif"
 Write-Success "`nHappy ESP32 coding! 🚀"

@@ -397,6 +397,76 @@ if command_exists code; then
     success "VS Code extensions installed"
 fi
 
+# Configure VS Code settings
+action "Configuring VS Code C++ settings..."
+VSCODE_SETTINGS_DIR="$USER_HOME/.config/Code/User"
+VSCODE_SETTINGS_FILE="$VSCODE_SETTINGS_DIR/settings.json"
+
+sudo -u $SUDO_USER mkdir -p "$VSCODE_SETTINGS_DIR"
+
+# Get compiler paths
+CMAKE_PATH=$(which cmake 2>/dev/null || echo "cmake")
+GCC_PATH=$(which gcc 2>/dev/null || echo "gcc")
+GPP_PATH=$(which g++ 2>/dev/null || echo "g++")
+CLANG_PATH=$(which clang 2>/dev/null || echo "clang")
+CLANGPP_PATH=$(which clang++ 2>/dev/null || echo "clang++")
+CLANGD_PATH=$(which clangd 2>/dev/null || echo "clangd")
+
+if [[ -f "$VSCODE_SETTINGS_FILE" ]]; then
+    # Update existing settings
+    TEMP_FILE=$(mktemp)
+    python3 -c "
+import json
+import sys
+try:
+    with open('$VSCODE_SETTINGS_FILE', 'r') as f:
+        settings = json.load(f)
+except:
+    settings = {}
+
+# CMake settings
+settings['cmake.cmakePath'] = '$CMAKE_PATH'
+settings['cmake.generator'] = 'Ninja'
+settings['cmake.configureSettings'] = {
+    'CMAKE_C_COMPILER': '$GCC_PATH',
+    'CMAKE_CXX_COMPILER': '$GPP_PATH'
+}
+
+# C++ IntelliSense
+settings['C_Cpp.default.compilerPath'] = '$GPP_PATH'
+
+# Clangd settings
+settings['clangd.path'] = '$CLANGD_PATH'
+
+# vcpkg integration
+if '$VCPKG_ROOT' and '$VCPKG_ROOT' != '':
+    settings['cmake.configureSettings']['CMAKE_TOOLCHAIN_FILE'] = '$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake'
+
+with open('$TEMP_FILE', 'w') as f:
+    json.dump(settings, f, indent=4)
+" 2>/dev/null || echo '{}' > "$TEMP_FILE"
+    
+    sudo -u $SUDO_USER cp "$TEMP_FILE" "$VSCODE_SETTINGS_FILE"
+    rm -f "$TEMP_FILE"
+else
+    # Create new settings
+    sudo -u $SUDO_USER cat > "$VSCODE_SETTINGS_FILE" <<EOF
+{
+    "cmake.cmakePath": "$CMAKE_PATH",
+    "cmake.generator": "Ninja",
+    "cmake.configureSettings": {
+        "CMAKE_C_COMPILER": "$GCC_PATH",
+        "CMAKE_CXX_COMPILER": "$GPP_PATH",
+        "CMAKE_TOOLCHAIN_FILE": "$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+    },
+    "C_Cpp.default.compilerPath": "$GPP_PATH",
+    "clangd.path": "$CLANGD_PATH"
+}
+EOF
+fi
+
+success "VS Code configured with C++ toolchain paths"
+
 # Install Oh My Posh
 action "Installing/Updating Oh My Posh..."
 if ! command_exists oh-my-posh; then

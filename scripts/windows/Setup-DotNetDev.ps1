@@ -11,7 +11,7 @@
     - Hyper-V (verification and enablement)
     - WSL2 with default Ubuntu distribution
     - Docker Desktop
-    - .NET SDK (latest LTS and current versions)
+    - .NET SDK (latest version: .NET 10, plus .NET 8 LTS)
     - Visual Studio (optional, default: yes)
     - JetBrains Rider (optional, default: no)
     
@@ -328,21 +328,76 @@ if (Test-Command "wsl") {
 
 # Install .NET SDK
 Write-Action "Installing/Updating .NET SDK..."
+
+# Install latest .NET SDK using winget (more up-to-date than chocolatey)
 if (-not (Test-Command "dotnet")) {
-    choco install dotnet-sdk -y
-    Write-Success ".NET SDK installed"
+    Write-Info "Installing latest .NET SDK via winget..."
+    if (Test-Command "winget") {
+        winget install Microsoft.DotNet.SDK.10 --silent --accept-source-agreements --accept-package-agreements
+        Write-Success ".NET SDK installed"
+    } else {
+        Write-Info "Winget not available, using Chocolatey..."
+        choco install dotnet-sdk -y
+        Write-Success ".NET SDK installed"
+    }
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 } else {
     Write-Success ".NET SDK already installed"
+    
     if (-not $SkipUpdates) {
-        choco upgrade dotnet-sdk -y
+        Write-Info "Updating .NET SDK to latest version..."
+        if (Test-Command "winget") {
+            # Upgrade to latest .NET SDK
+            winget upgrade Microsoft.DotNet.SDK.10 --silent --accept-source-agreements --accept-package-agreements 2>$null
+            Write-Success ".NET SDK updated"
+        } else {
+            choco upgrade dotnet-sdk -y
+        }
     }
+}
+
+# Install .NET 8 LTS (if not present)
+Write-Action "Checking .NET 8 LTS..."
+$dotnetSdks = ""
+if (Test-Command "dotnet") {
+    $dotnetSdks = dotnet --list-sdks 2>$null | Out-String
+}
+
+if ($dotnetSdks -notmatch "8\.0\.") {
+    Write-Info "Installing .NET 8 LTS..."
+    if (Test-Command "winget") {
+        winget install Microsoft.DotNet.SDK.8 --silent --accept-source-agreements --accept-package-agreements 2>$null
+        Write-Success ".NET 8 LTS installed"
+    } else {
+        choco install dotnet-8.0-sdk -y 2>$null
+        Write-Success ".NET 8 LTS installed"
+    }
+} else {
+    Write-Success ".NET 8 LTS already installed"
+}
+
+# Install .NET 10 (latest) if available
+Write-Action "Checking .NET 10 (latest)..."
+if ($dotnetSdks -notmatch "10\.0\.") {
+    Write-Info "Installing .NET 10 (latest)..."
+    if (Test-Command "winget") {
+        $result = winget install Microsoft.DotNet.SDK.10 --silent --accept-source-agreements --accept-package-agreements 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success ".NET 10 installed"
+        } else {
+            Write-Info ".NET 10 not yet available or already installed"
+        }
+    }
+} else {
+    Write-Success ".NET 10 already installed"
 }
 
 # Display .NET info
 if (Test-Command "dotnet") {
     Write-Info "Installed .NET SDKs:"
     dotnet --list-sdks
+    Write-Info "`nInstalled .NET Runtimes:"
+    dotnet --list-runtimes
 }
 
 # Install Docker Desktop

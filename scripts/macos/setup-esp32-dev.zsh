@@ -7,6 +7,7 @@
 # - Git version control
 # - Visual Studio Code with ESP32/PlatformIO/C++ extensions
 # - ESP-IDF (ESP32 SDK)
+# - CMake, GCC, Clang
 # - PlatformIO
 # - C/C++ build tools
 # - Python (required for ESP-IDF)
@@ -171,6 +172,7 @@ if command_exists code; then
         "GitHub.copilot-chat"
         "usernamehw.errorlens"
         "jeff-hykin.better-cpp-syntax"
+        "llvm-vs-code-extensions.vscode-clangd"
     )
     for ext in "${extensions[@]}"; do
         info "Installing extension: $ext"
@@ -205,8 +207,15 @@ fi
 
 # Install additional build tools
 action "Installing build dependencies..."
-brew install pkg-config dfu-util 2>/dev/null || true
+brew install pkg-config dfu-util gcc llvm 2>/dev/null || true
 success "Build dependencies installed"
+
+# Add LLVM/Clang to PATH
+if [[ -d "/opt/homebrew/opt/llvm/bin" ]]; then
+    add_to_path "/opt/homebrew/opt/llvm/bin"
+elif [[ -d "/usr/local/opt/llvm/bin" ]]; then
+    add_to_path "/usr/local/opt/llvm/bin"
+fi
 
 # Install ESP-IDF
 action "Installing ESP-IDF (ESP32 SDK)..."
@@ -260,6 +269,48 @@ else
         pip3 install --upgrade platformio
     fi
 fi
+
+# Configure ESP-IDF extension in VS Code
+action "Configuring ESP-IDF extension..."
+VSCODE_SETTINGS_DIR="$HOME/Library/Application Support/Code/User"
+VSCODE_SETTINGS_FILE="$VSCODE_SETTINGS_DIR/settings.json"
+
+mkdir -p "$VSCODE_SETTINGS_DIR"
+
+if [[ -f "$VSCODE_SETTINGS_FILE" ]]; then
+    # Update existing settings
+    TEMP_FILE=$(mktemp)
+    python3 -c "
+import json
+import sys
+try:
+    with open('$VSCODE_SETTINGS_FILE', 'r') as f:
+        settings = json.load(f)
+except:
+    settings = {}
+
+settings['idf.espIdfPath'] = '$ESP_IDF_PATH'
+settings['idf.toolsPath'] = '$HOME/.espressif'
+settings['idf.pythonBinPath'] = '$(which python3)'
+
+with open('$TEMP_FILE', 'w') as f:
+    json.dump(settings, f, indent=4)
+" 2>/dev/null || echo '{}' > "$TEMP_FILE"
+    
+    cp "$TEMP_FILE" "$VSCODE_SETTINGS_FILE"
+    rm -f "$TEMP_FILE"
+else
+    # Create new settings
+    cat > "$VSCODE_SETTINGS_FILE" <<EOF
+{
+    "idf.espIdfPath": "$ESP_IDF_PATH",
+    "idf.toolsPath": "$HOME/.espressif",
+    "idf.pythonBinPath": "$(which python3)"
+}
+EOF
+fi
+
+success "ESP-IDF extension configured with path: $ESP_IDF_PATH"
 
 # Install USB drivers
 action "Installing USB drivers..."
@@ -322,6 +373,8 @@ command_exists git && success "Git is ready" || warning "Git needs attention"
 command_exists code && success "VS Code is ready" || warning "VS Code needs attention"
 command_exists cmake && success "CMake is ready" || warning "CMake needs attention"
 command_exists ninja && success "Ninja is ready" || warning "Ninja needs attention"
+command_exists gcc && success "GCC is ready" || warning "GCC needs attention"
+command_exists clang && success "Clang is ready" || warning "Clang needs attention"
 [[ -d "$ESP_IDF_PATH" ]] && success "ESP-IDF is ready" || warning "ESP-IDF needs attention"
 command_exists pio && success "PlatformIO is ready" || warning "PlatformIO needs attention"
 command_exists oh-my-posh && success "Oh My Posh is ready" || warning "Oh My Posh needs attention"
@@ -345,6 +398,14 @@ fi
 
 if command_exists cmake; then
     info "CMake: $(cmake --version | head -n1)"
+fi
+
+if command_exists gcc; then
+    info "GCC: $(gcc --version | head -n1)"
+fi
+
+if command_exists clang; then
+    info "Clang: $(clang --version | head -n1)"
 fi
 
 if command_exists pio; then

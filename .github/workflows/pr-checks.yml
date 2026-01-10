@@ -1,0 +1,152 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pr-metadata:
+    name: 📋 PR Metadata Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📝 PR Information
+        run: |
+          echo "### 📋 Pull Request Details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Title:** ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Author:** @${{ github.event.pull_request.user.login }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Target Branch:** \`${{ github.base_ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source Branch:** \`${{ github.head_ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changed Files:** ${{ github.event.pull_request.changed_files }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Additions:** +${{ github.event.pull_request.additions }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deletions:** -${{ github.event.pull_request.deletions }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: ✅ PR title check
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          if echo "$TITLE" | grep -qE "^(feat|fix|docs|refactor|test|chore|style|perf|ci):"; then
+            echo "✅ PR title follows conventional commits format"
+          else
+            echo "⚠️ PR title should follow conventional commits format"
+            echo "::warning::Recommended format: 'feat: description', 'fix: description', etc."
+          fi
+
+  file-structure-check:
+    name: 📁 File Structure Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Validate directory structure
+        run: |
+          echo "ℹ️ Checking directory naming conventions..."
+
+          # Check for uppercase directory names in scripts/
+          INVALID_DIRS=$(find scripts/ -type d -name "*[A-Z]*" 2>/dev/null || true)
+
+          if [ -n "$INVALID_DIRS" ]; then
+            echo "❌ Found directories with uppercase letters:"
+            echo "$INVALID_DIRS"
+            echo "::error::Directory names must be lowercase (scripts/windows/, scripts/linux/, scripts/macos/)"
+            exit 1
+          else
+            echo "✅ All directory names are lowercase"
+          fi
+
+      - name: 📝 Validate script naming conventions
+        run: |
+          echo "ℹ️ Checking script naming conventions..."
+
+          # Check Windows scripts (should be PascalCase with .ps1)
+          WINDOWS_INVALID=$(find scripts/windows/ -type f -name "*.ps1" ! -name "[A-Z]*" 2>/dev/null || true)
+          if [ -n "$WINDOWS_INVALID" ]; then
+            echo "⚠️ Windows scripts should use PascalCase:"
+            echo "$WINDOWS_INVALID"
+            echo "::warning::Windows scripts should follow PascalCase naming (e.g., Install-Docker.ps1)"
+          fi
+
+          # Check Linux scripts (should be lowercase with .sh)
+          LINUX_INVALID=$(find scripts/linux/ -type f -name "*.sh" -name "*[A-Z]*" 2>/dev/null || true)
+          if [ -n "$LINUX_INVALID" ]; then
+            echo "⚠️ Linux scripts should use lowercase:"
+            echo "$LINUX_INVALID"
+            echo "::warning::Linux scripts should follow lowercase naming (e.g., install-docker.sh)"
+          fi
+
+          # Check macOS scripts (should be lowercase with .zsh)
+          MACOS_INVALID=$(find scripts/macos/ -type f -name "*.zsh" -name "*[A-Z]*" 2>/dev/null || true)
+          if [ -n "$MACOS_INVALID" ]; then
+            echo "⚠️ macOS scripts should use lowercase:"
+            echo "$MACOS_INVALID"
+            echo "::warning::macOS scripts should follow lowercase naming (e.g., install-docker.zsh)"
+          fi
+
+          echo "✅ Naming convention check completed"
+
+  documentation-check:
+    name: 📚 Documentation Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📝 Check for documentation
+        run: |
+          # Get changed script files
+          CHANGED_SCRIPTS=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E "scripts/(windows|linux|macos)/" || true)
+
+          if [ -n "$CHANGED_SCRIPTS" ]; then
+            echo "📝 Script files changed:"
+            echo "$CHANGED_SCRIPTS"
+
+            # Check if README.md was updated
+            README_UPDATED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep "README.md" || true)
+
+            if [ -z "$README_UPDATED" ]; then
+              echo "::warning::Scripts were modified but README.md was not updated. Consider adding documentation."
+            else
+              echo "✅ README.md was updated"
+            fi
+          fi
+
+  pr-size-check:
+    name: 📏 PR Size Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📊 Check PR size
+        run: |
+          CHANGED_FILES=${{ github.event.pull_request.changed_files }}
+          ADDITIONS=${{ github.event.pull_request.additions }}
+          DELETIONS=${{ github.event.pull_request.deletions }}
+          TOTAL_CHANGES=$((ADDITIONS + DELETIONS))
+
+          echo "### 📊 PR Size Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Files changed: $CHANGED_FILES" >> $GITHUB_STEP_SUMMARY
+          echo "- Lines added: +$ADDITIONS" >> $GITHUB_STEP_SUMMARY
+          echo "- Lines deleted: -$DELETIONS" >> $GITHUB_STEP_SUMMARY
+          echo "- Total changes: $TOTAL_CHANGES" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ $TOTAL_CHANGES -gt 1000 ]; then
+            echo "⚠️ **Large PR detected!** Consider splitting into smaller PRs for easier review." >> $GITHUB_STEP_SUMMARY
+            echo "::warning::This PR has $TOTAL_CHANGES line changes. Consider splitting for easier review."
+          elif [ $TOTAL_CHANGES -gt 500 ]; then
+            echo "📝 **Medium-sized PR.** Review may take some time." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Good PR size** for efficient review!" >> $GITHUB_STEP_SUMMARY
+          fi

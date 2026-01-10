@@ -258,6 +258,98 @@ if command_exists code; then
     success "VS Code extensions installed"
 fi
 
+# Configure VS Code settings
+action "Configuring VS Code C++ settings..."
+VSCODE_SETTINGS_DIR="$HOME/Library/Application Support/Code/User"
+VSCODE_SETTINGS_FILE="$VSCODE_SETTINGS_DIR/settings.json"
+
+mkdir -p "$VSCODE_SETTINGS_DIR"
+
+# Get compiler paths
+CMAKE_PATH=$(which cmake 2>/dev/null || echo "cmake")
+CLANG_PATH=$(which clang 2>/dev/null || echo "clang")
+CLANGPP_PATH=$(which clang++ 2>/dev/null || echo "clang++")
+CLANGD_PATH="$(brew --prefix llvm)/bin/clangd"
+
+# Get GCC path (Homebrew version)
+if brew list gcc &>/dev/null; then
+    GCC_VERSION=$(ls $(brew --prefix)/bin/gcc-* 2>/dev/null | head -n1)
+    GPP_VERSION=$(ls $(brew --prefix)/bin/g++-* 2>/dev/null | head -n1)
+else
+    GCC_VERSION="gcc"
+    GPP_VERSION="g++"
+fi
+
+# Get LLVM Clang path
+LLVM_CLANG="$(brew --prefix llvm)/bin/clang"
+LLVM_CLANGPP="$(brew --prefix llvm)/bin/clang++"
+
+if [[ -f "$VSCODE_SETTINGS_FILE" ]]; then
+    # Update existing settings
+    TEMP_FILE=$(mktemp)
+    python3 -c "
+import json
+import sys
+try:
+    with open('$VSCODE_SETTINGS_FILE', 'r') as f:
+        settings = json.load(f)
+except:
+    settings = {}
+
+# CMake settings
+settings['cmake.cmakePath'] = '$CMAKE_PATH'
+settings['cmake.generator'] = 'Ninja'
+settings['cmake.configureSettings'] = {
+    'CMAKE_C_COMPILER': '$CLANG_PATH',
+    'CMAKE_CXX_COMPILER': '$CLANGPP_PATH'
+}
+
+# C++ IntelliSense
+settings['C_Cpp.default.compilerPath'] = '$CLANGPP_PATH'
+
+# Clangd settings (LLVM version)
+if '$CLANGD_PATH':
+    settings['clangd.path'] = '$CLANGD_PATH'
+
+# vcpkg integration
+if '$VCPKG_ROOT' and '$VCPKG_ROOT' != '':
+    settings['cmake.configureSettings']['CMAKE_TOOLCHAIN_FILE'] = '$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake'
+
+# Additional compilers available
+settings['cmake.additionalCompilerSearchDirs'] = [
+    '$(brew --prefix llvm)/bin',
+    '$(brew --prefix)/bin'
+]
+
+with open('$TEMP_FILE', 'w') as f:
+    json.dump(settings, f, indent=4)
+" 2>/dev/null || echo '{}' > "$TEMP_FILE"
+    
+    cp "$TEMP_FILE" "$VSCODE_SETTINGS_FILE"
+    rm -f "$TEMP_FILE"
+else
+    # Create new settings
+    cat > "$VSCODE_SETTINGS_FILE" <<EOF
+{
+    "cmake.cmakePath": "$CMAKE_PATH",
+    "cmake.generator": "Ninja",
+    "cmake.configureSettings": {
+        "CMAKE_C_COMPILER": "$CLANG_PATH",
+        "CMAKE_CXX_COMPILER": "$CLANGPP_PATH",
+        "CMAKE_TOOLCHAIN_FILE": "$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+    },
+    "C_Cpp.default.compilerPath": "$CLANGPP_PATH",
+    "clangd.path": "$CLANGD_PATH",
+    "cmake.additionalCompilerSearchDirs": [
+        "$(brew --prefix llvm)/bin",
+        "$(brew --prefix)/bin"
+    ]
+}
+EOF
+fi
+
+success "VS Code configured with C++ toolchain paths"
+
 # Install Oh My Posh
 action "Installing/Updating Oh My Posh..."
 if ! command_exists oh-my-posh; then

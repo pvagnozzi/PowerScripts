@@ -278,6 +278,67 @@ if (Test-Command "code") {
     Write-Success "VS Code extensions installed"
 }
 
+# Configure VS Code settings
+Write-Action "Configuring VS Code C++ settings..."
+$vscodeSettingsDir = "$env:APPDATA\Code\User"
+$vscodeSettingsFile = "$vscodeSettingsDir\settings.json"
+
+if (-not (Test-Path $vscodeSettingsDir)) {
+    New-Item -ItemType Directory -Path $vscodeSettingsDir -Force | Out-Null
+}
+
+if (Test-Path $vscodeSettingsFile) {
+    $settings = Get-Content $vscodeSettingsFile -Raw | ConvertFrom-Json
+} else {
+    $settings = @{}
+}
+
+# Get CMake path
+$cmakePath = (Get-Command cmake -ErrorAction SilentlyContinue).Source
+if ($cmakePath) {
+    $settings | Add-Member -NotePropertyName "cmake.cmakePath" -NotePropertyValue $cmakePath -Force
+}
+
+# Get GCC path
+$gccPath = (Get-Command gcc -ErrorAction SilentlyContinue).Source
+$gppPath = (Get-Command g++ -ErrorAction SilentlyContinue).Source
+
+# Get Clang path
+$clangPath = (Get-Command clang -ErrorAction SilentlyContinue).Source
+$clangppPath = (Get-Command clang++ -ErrorAction SilentlyContinue).Source
+
+# Configure C++ IntelliSense
+if ($gppPath) {
+    $settings | Add-Member -NotePropertyName "C_Cpp.default.compilerPath" -NotePropertyValue $gppPath -Force
+}
+
+# Configure CMake generator
+$settings | Add-Member -NotePropertyName "cmake.generator" -NotePropertyValue "Ninja" -Force
+$settings | Add-Member -NotePropertyName "cmake.configureSettings" -NotePropertyValue @{
+    "CMAKE_C_COMPILER" = $gccPath
+    "CMAKE_CXX_COMPILER" = $gppPath
+} -Force
+
+# Configure Clangd
+if ($clangPath) {
+    $clangdPath = (Get-Command clangd -ErrorAction SilentlyContinue).Source
+    if ($clangdPath) {
+        $settings | Add-Member -NotePropertyName "clangd.path" -NotePropertyValue $clangdPath -Force
+    }
+}
+
+# Configure vcpkg
+if (Test-Path $vcpkgPath) {
+    $settings | Add-Member -NotePropertyName "cmake.configureSettings" -NotePropertyValue @{
+        "CMAKE_TOOLCHAIN_FILE" = "$vcpkgPath\scripts\buildsystems\vcpkg.cmake"
+        "CMAKE_C_COMPILER" = $gccPath
+        "CMAKE_CXX_COMPILER" = $gppPath
+    } -Force
+}
+
+$settings | ConvertTo-Json -Depth 10 | Set-Content $vscodeSettingsFile -Force
+Write-Success "VS Code configured with C++ toolchain paths"
+
 # Install Oh My Posh
 Write-Action "Installing/Updating Oh My Posh..."
 if (-not (Test-Command "oh-my-posh")) {

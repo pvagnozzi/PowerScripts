@@ -5,6 +5,8 @@
 .DESCRIPTION
     This script automates the installation of Docker Desktop for Windows including:
     - WSL2 installation and configuration
+    - WSL2 updates to latest version
+    - Ubuntu installation and system updates
     - Hyper-V enablement verification
     - Docker Desktop installation via Winget
     - Post-installation configuration
@@ -215,9 +217,14 @@ function Install-WSL2 {
             Write-ColorOutput "WSL2 set as default version" "Success" "✅"
         }
         
-        Write-ColorOutput "Updating WSL..." "Info" "📥"
-        wsl --update 2>&1 | Out-Null
-        Write-ColorOutput "WSL updated successfully" "Success" "✅"
+        Write-ColorOutput "Updating WSL kernel and components..." "Info" "📥"
+        try {
+            wsl --update 2>&1 | Out-Null
+            Write-ColorOutput "WSL updated successfully" "Success" "✅"
+        }
+        catch {
+            Write-ColorOutput "WSL update completed with warnings" "Warning" "⚠️"
+        }
     }
     else {
         Write-ColorOutput "Installing WSL..." "Info" "📥"
@@ -229,6 +236,59 @@ function Install-WSL2 {
         catch {
             Write-ColorOutput "WSL installation requires a reboot to complete" "Warning" "⚠️"
             $Script:NeedsReboot = $true
+        }
+    }
+}
+
+function Install-Ubuntu {
+    Write-SectionHeader "🐧 UBUNTU INSTALLATION"
+    
+    if ($SkipWSL) {
+        Write-ColorOutput "Ubuntu installation skipped (WSL disabled)" "Info" "⏭️"
+        return
+    }
+    
+    if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) {
+        Write-ColorOutput "WSL not available. Ubuntu installation will be completed after reboot." "Warning" "⚠️"
+        return
+    }
+    
+    Write-ColorOutput "Checking for installed WSL distributions..." "Info" "🔍"
+    $wslList = wsl --list --quiet 2>&1 | Where-Object { $_ -match '\S' }
+    
+    $hasUbuntu = $false
+    if ($wslList) {
+        foreach ($distro in $wslList) {
+            if ($distro -match "Ubuntu") {
+                $hasUbuntu = $true
+                Write-ColorOutput "Ubuntu is already installed: $distro" "Success" "✅"
+                break
+            }
+        }
+    }
+    
+    if (-not $hasUbuntu) {
+        Write-ColorOutput "Ubuntu not found. Installing Ubuntu..." "Info" "📥"
+        try {
+            wsl --install -d Ubuntu 2>&1 | Out-Null
+            Write-ColorOutput "Ubuntu installation initiated" "Success" "✅"
+            Write-ColorOutput "You will need to create a user account on first Ubuntu launch" "Info" "ℹ️"
+        }
+        catch {
+            Write-ColorOutput "Error installing Ubuntu: $($_.Exception.Message)" "Error" "❌"
+            Write-ColorOutput "You can install it manually after reboot with: wsl --install -d Ubuntu" "Info" "💡"
+        }
+    }
+    
+    if ($hasUbuntu) {
+        Write-ColorOutput "Updating Ubuntu system packages..." "Info" "📦"
+        try {
+            wsl -d Ubuntu -e bash -c "sudo apt-get update -qq && sudo apt-get upgrade -y -qq" 2>&1 | Out-Null
+            Write-ColorOutput "Ubuntu packages updated successfully" "Success" "✅"
+        }
+        catch {
+            Write-ColorOutput "Ubuntu update requires manual completion" "Warning" "⚠️"
+            Write-ColorOutput "Run: wsl -d Ubuntu -e bash -c 'sudo apt-get update && sudo apt-get upgrade -y'" "Info" "💡"
         }
     }
 }
@@ -336,6 +396,7 @@ Write-ColorOutput "System requirements met" "Success" "✅"
 
 Enable-HyperV
 Install-WSL2
+Install-Ubuntu
 Install-DockerDesktop
 Set-DockerConfiguration
 

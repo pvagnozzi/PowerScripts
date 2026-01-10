@@ -1,0 +1,105 @@
+name: Branch Protection Check
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  block-direct-push:
+    name: ❌ Block Direct Push to Protected Branches
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.event.pull_request == null
+    
+    steps:
+      - name: ⚠️ Direct push detected
+        run: |
+          echo "::error::❌ Direct pushes to ${{ github.ref_name }} are not allowed!"
+          echo "::error::ℹ️ Please create a Pull Request instead."
+          exit 1
+
+  validate-pr:
+    name: ✅ Validate Pull Request
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: ✅ PR validation
+        run: |
+          echo "✅ Pull Request detected for ${{ github.base_ref }}"
+          echo "📝 PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+          echo "👤 Author: ${{ github.event.pull_request.user.login }}"
+          echo "ℹ️ This is the correct way to update protected branches!"
+
+  quality-checks:
+    name: 🔍 Quality Checks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 🔍 Check for README updates
+        run: |
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "scripts/"; then
+            if ! git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "README.md"; then
+              echo "⚠️ Warning: Scripts modified but README.md not updated"
+              echo "::warning::Consider updating README.md with new script documentation"
+            fi
+          fi
+          
+      - name: 📝 Check commit message format
+        run: |
+          echo "ℹ️ Checking commit message format..."
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -qE "^(feat|fix|docs|refactor|test|chore|style|perf|ci):"; then
+            echo "✅ Commit message follows conventional commits format"
+          else
+            echo "⚠️ Warning: Commit message should follow conventional commits (feat:, fix:, docs:, etc.)"
+            echo "::warning::Consider using conventional commit format: https://www.conventionalcommits.org/"
+          fi
+
+  cross-platform-check:
+    name: 🔄 Cross-Platform Consistency Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: 🔍 Check cross-platform consistency
+        run: |
+          echo "ℹ️ Checking if all platform versions are updated..."
+          
+          # Get modified files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          
+          # Check Windows scripts
+          WINDOWS_SCRIPTS=$(echo "$CHANGED_FILES" | grep "scripts/windows/" | sed 's|scripts/windows/||' | sed 's|\.ps1$||' | tr '[:upper:]' '[:lower:]' | sed 's|-||g' || true)
+          
+          # Check Linux scripts  
+          LINUX_SCRIPTS=$(echo "$CHANGED_FILES" | grep "scripts/linux/" | sed 's|scripts/linux/||' | sed 's|\.sh$||' | sed 's|-||g' || true)
+          
+          # Check macOS scripts
+          MACOS_SCRIPTS=$(echo "$CHANGED_FILES" | grep "scripts/macos/" | sed 's|scripts/macos/||' | sed 's|\.zsh$||' | sed 's|-||g' || true)
+          
+          # Simple check - if any platform script is modified, warn about updating others
+          if [ -n "$WINDOWS_SCRIPTS" ] || [ -n "$LINUX_SCRIPTS" ] || [ -n "$MACOS_SCRIPTS" ]; then
+            echo "📝 Platform-specific scripts modified:"
+            [ -n "$WINDOWS_SCRIPTS" ] && echo "  - Windows: $WINDOWS_SCRIPTS"
+            [ -n "$LINUX_SCRIPTS" ] && echo "  - Linux: $LINUX_SCRIPTS"
+            [ -n "$MACOS_SCRIPTS" ] && echo "  - macOS: $MACOS_SCRIPTS"
+            echo "⚠️ Remember: Scripts should have the same functionality across all platforms!"
+            echo "::warning::Verify that equivalent scripts are updated on all platforms (Windows, Linux, macOS)"
+          else
+            echo "✅ No platform-specific script changes detected"
+          fi
